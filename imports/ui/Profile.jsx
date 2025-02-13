@@ -21,8 +21,6 @@ export const Profile = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState('');
-  const [repoInput, setRepoInput] = useState('');
-  const [isConnecting, setIsConnecting] = useState(false);
 
   // Update local state when profile changes
   useEffect(() => {
@@ -54,20 +52,6 @@ export const Profile = () => {
       setError(error.message);
     } finally {
       setIsSyncing(false);
-    }
-  };
-
-  const handleConnectRepo = async () => {
-    setIsConnecting(true);
-    setError('');
-    try {
-      await Meteor.callAsync('userProfiles.connectRepo', repoInput);
-      setRepoInput('');
-    } catch (error) {
-      console.error('Failed to connect repository:', error);
-      setError(error.message);
-    } finally {
-      setIsConnecting(false);
     }
   };
 
@@ -115,48 +99,6 @@ export const Profile = () => {
               {isSyncing ? 'Syncing...' : 'Sync with GitHub'}
             </Button>
           </Flex>
-
-          {/* Connected Repository */}
-          {profile.connectedRepo ? (
-            <Card>
-              <Flex direction="column" gap="2">
-                <Text size="3" weight="bold">Connected Repository</Text>
-                <Link 
-                  href={profile.repoData?.url} 
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {profile.connectedRepo}
-                </Link>
-                <Text size="2">{profile.repoData?.description}</Text>
-                <Flex gap="4">
-                  <Text size="2">⭐️ {profile.repoData?.stars || 0} stars</Text>
-                  <Text size="2">🔀 {profile.repoData?.forks || 0} forks</Text>
-                </Flex>
-              </Flex>
-            </Card>
-          ) : (
-            <Card>
-              <Flex direction="column" gap="2">
-                <Text size="3" weight="bold">Connect Repository</Text>
-                <Flex gap="2">
-                  <TextField.Root style={{ flex: 1 }}>
-                    <TextField.Input 
-                      placeholder="username/repository"
-                      value={repoInput}
-                      onChange={(e) => setRepoInput(e.target.value)}
-                    />
-                  </TextField.Root>
-                  <Button 
-                    onClick={handleConnectRepo}
-                    disabled={isConnecting}
-                  >
-                    {isConnecting ? 'Connecting...' : 'Connect'}
-                  </Button>
-                </Flex>
-              </Flex>
-            </Card>
-          )}
 
           {/* GitHub Stats */}
           {profile.githubUsername && (

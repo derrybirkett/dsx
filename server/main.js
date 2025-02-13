@@ -43,12 +43,37 @@ Meteor.startup(async () => {
 
   console.log('GitHub OAuth configured successfully');
 
-  // Log some debug information
-  console.log('Server started');
+  // Log detailed collection data
+  console.log('=== Collection Status ===');
   const userCount = await Meteor.users.find().countAsync();
+  const users = await Meteor.users.find({}, {
+    fields: { 
+      '_id': 1,
+      'profile.name': 1,
+      'services.github.username': 1
+    }
+  }).fetchAsync();
+  
   const profileCount = await UserProfiles.find().countAsync();
-  console.log('Number of users:', userCount);
-  console.log('Number of profiles:', profileCount);
+  const profiles = await UserProfiles.find().fetchAsync();
+  
+  console.log('Users:', {
+    count: userCount,
+    samples: users.map(u => ({
+      id: u._id,
+      name: u.profile?.name,
+      githubUsername: u.services?.github?.username
+    }))
+  });
+  
+  console.log('Profiles:', {
+    count: profileCount,
+    samples: profiles.map(p => ({
+      userId: p.userId,
+      username: p.githubUsername,
+      updatedAt: p.updatedAt
+    }))
+  });
 
   // If the Links collection is empty, add some data.
   if (await LinksCollection.find().countAsync() === 0) {

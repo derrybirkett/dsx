@@ -6,14 +6,27 @@ import { useTracker } from 'meteor/react-meteor-data';
 import { ActivityLogs } from './ActivityLogs.jsx';
 import { Profile } from './Profile.jsx';
 import { Preview } from './Preview.jsx';
+import { Directory } from './Directory.jsx';
+import { DeveloperPage } from './DeveloperPage.jsx';
 import { Theme, Button, Text, Container, Flex, Heading, Card, Box, Tabs, Grid, Avatar, DropdownMenu, Tooltip } from '@radix-ui/themes';
-import { GitHubLogoIcon, ExitIcon, CodeIcon, PersonIcon, MapPinIcon, ChevronDownIcon, HomeIcon, ActivityLogIcon, InfoCircledIcon } from '@radix-ui/react-icons';
+import { GitHubLogoIcon, ExitIcon, CodeIcon, PersonIcon, MapPinIcon, ChevronDownIcon, HomeIcon, ActivityLogIcon, InfoCircledIcon, GroupIcon } from '@radix-ui/react-icons';
 
 export const App = () => {
   const user = useTracker(() => Meteor.user());
   const userId = useTracker(() => Meteor.userId());
   const isLoading = useTracker(() => Meteor.loggingIn());
   const [activeTab, setActiveTab] = React.useState('preview');
+  const [selectedDeveloperId, setSelectedDeveloperId] = React.useState(null);
+
+  // Reset to preview tab when login state changes
+  React.useEffect(() => {
+    if (userId) {
+      setActiveTab('preview');
+    } else {
+      setActiveTab('home'); // Reset to home when logged out
+    }
+  }, [userId]);
+
   const [isDark, setIsDark] = React.useState(() => {
     const saved = localStorage.getItem('theme');
     if (saved) return saved === 'dark';
@@ -104,6 +117,12 @@ export const App = () => {
                     isActive={activeTab === 'profile'} 
                   />
                   <NavButton 
+                    icon={GroupIcon} 
+                    label="Directory" 
+                    value="directory" 
+                    isActive={activeTab === 'directory'} 
+                  />
+                  <NavButton 
                     icon={ActivityLogIcon} 
                     label="Activity" 
                     value="activity" 
@@ -152,14 +171,24 @@ export const App = () => {
                 </DropdownMenu.Content>
               </DropdownMenu.Root>
             ) : (
-              <Button 
-                onClick={handleGitHubLogin}
-                variant="soft"
-                size="2"
-              >
-                <GitHubLogoIcon width="16" height="16" />
-                Login with GitHub
-              </Button>
+              <Flex gap="2">
+                <Button 
+                  onClick={() => setActiveTab('directory')}
+                  variant="soft"
+                  size="2"
+                >
+                  <GroupIcon width="16" height="16" />
+                  Directory
+                </Button>
+                <Button 
+                  onClick={handleGitHubLogin}
+                  variant="soft"
+                  size="2"
+                >
+                  <GitHubLogoIcon width="16" height="16" />
+                  Login with GitHub
+                </Button>
+              </Flex>
             )}
           </Flex>
         </Container>
@@ -175,6 +204,22 @@ export const App = () => {
             )}
             {activeTab === 'profile' && <Profile />}
             {activeTab === 'preview' && <Preview />}
+            {activeTab === 'directory' && (
+              selectedDeveloperId ? (
+                <Box>
+                  <Button 
+                    variant="soft" 
+                    onClick={() => setSelectedDeveloperId(null)}
+                    mb="4"
+                  >
+                    ← Back to Directory
+                  </Button>
+                  <DeveloperPage userId={selectedDeveloperId} />
+                </Box>
+              ) : (
+                <Directory onSelectDeveloper={setSelectedDeveloperId} />
+              )
+            )}
             {activeTab === 'info' && (
               <Card style={{ padding: '20px' }}>
                 <Info />
@@ -184,31 +229,59 @@ export const App = () => {
         </Container>
       ) : (
         <Container size="4" style={{ padding: '20px' }}>
-          <Flex direction="column" gap="8" align="center" justify="center" style={{ minHeight: 'calc(100vh - 200px)' }}>
-            <Heading 
-              size="9" 
-              align="center"
-              style={{ 
-                maxWidth: '800px',
-                lineHeight: '1.2'
-              }}
-            >
-              Digital Product Designer: UX, UI, Art Direction & Front-end
-            </Heading>
-            <Button 
-              size="4"
-              onClick={handleGitHubLogin}
-              style={{
-                padding: '24px 48px',
-                fontSize: '18px',
-                backgroundColor: isDark ? 'white' : 'black',
-                color: isDark ? 'black' : 'white'
-              }}
-            >
-              <GitHubLogoIcon width="24" height="24" />
-              Connect with GitHub
-            </Button>
-          </Flex>
+          {activeTab === 'directory' ? (
+            selectedDeveloperId ? (
+              <Box>
+                <Button 
+                  variant="soft" 
+                  onClick={() => setSelectedDeveloperId(null)}
+                  mb="4"
+                >
+                  ← Back to Directory
+                </Button>
+                <DeveloperPage userId={selectedDeveloperId} />
+              </Box>
+            ) : (
+              <Directory onSelectDeveloper={setSelectedDeveloperId} />
+            )
+          ) : (
+            <Flex direction="column" gap="8" align="center" justify="center" style={{ minHeight: 'calc(100vh - 200px)' }}>
+              <Heading 
+                size="9" 
+                align="center"
+                style={{ 
+                  maxWidth: '800px',
+                  lineHeight: '1.2'
+                }}
+              >
+                Flex your git
+              </Heading>
+              <Text 
+                size="4" 
+                align="center" 
+                style={{ 
+                  maxWidth: '600px',
+                  opacity: 0.8,
+                  marginTop: '-24px'
+                }}
+              >
+                Turn your GitHub profile into a beautiful portfolio. Connect your repositories and showcase your work in style.
+              </Text>
+              <Button 
+                size="4"
+                onClick={handleGitHubLogin}
+                style={{
+                  padding: '24px 48px',
+                  fontSize: '18px',
+                  backgroundColor: isDark ? 'white' : 'black',
+                  color: isDark ? 'black' : 'white'
+                }}
+              >
+                <GitHubLogoIcon width="24" height="24" />
+                Connect with GitHub
+              </Button>
+            </Flex>
+          )}
         </Container>
       )}
     </Theme>
