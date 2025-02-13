@@ -1,6 +1,4 @@
 import React from 'react';
-import { Hello } from './Hello.jsx';
-import { Info } from './Info.jsx';
 import { Meteor } from 'meteor/meteor';
 import { useTracker } from 'meteor/react-meteor-data';
 import { ActivityLogs } from './ActivityLogs.jsx';
@@ -9,7 +7,7 @@ import { Preview } from './Preview.jsx';
 import { Directory } from './Directory.jsx';
 import { DeveloperPage } from './DeveloperPage.jsx';
 import { Theme, Button, Text, Container, Flex, Heading, Card, Box, Tabs, Grid, Avatar, DropdownMenu, Tooltip } from '@radix-ui/themes';
-import { GitHubLogoIcon, ExitIcon, CodeIcon, PersonIcon, MapPinIcon, ChevronDownIcon, HomeIcon, ActivityLogIcon, InfoCircledIcon, GroupIcon } from '@radix-ui/react-icons';
+import { GitHubLogoIcon, ExitIcon, CodeIcon, PersonIcon, MapPinIcon, ChevronDownIcon, HomeIcon, ActivityLogIcon, GroupIcon } from '@radix-ui/react-icons';
 
 export const App = () => {
   const user = useTracker(() => Meteor.user());
@@ -111,28 +109,10 @@ export const App = () => {
                     isActive={activeTab === 'preview'} 
                   />
                   <NavButton 
-                    icon={PersonIcon} 
-                    label="Profile" 
-                    value="profile" 
-                    isActive={activeTab === 'profile'} 
-                  />
-                  <NavButton 
                     icon={GroupIcon} 
                     label="Directory" 
                     value="directory" 
                     isActive={activeTab === 'directory'} 
-                  />
-                  <NavButton 
-                    icon={ActivityLogIcon} 
-                    label="Activity" 
-                    value="activity" 
-                    isActive={activeTab === 'activity'} 
-                  />
-                  <NavButton 
-                    icon={InfoCircledIcon} 
-                    label="Info" 
-                    value="info" 
-                    isActive={activeTab === 'info'} 
                   />
                 </Flex>
               )}
@@ -153,6 +133,22 @@ export const App = () => {
                   </Button>
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Content>
+                  <DropdownMenu.Item 
+                    onClick={() => setActiveTab('profile')}
+                  >
+                    <Flex gap="2" align="center">
+                      <PersonIcon />
+                      Edit Profile
+                    </Flex>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item 
+                    onClick={() => setActiveTab('activity')}
+                  >
+                    <Flex gap="2" align="center">
+                      <ActivityLogIcon />
+                      Activity Log
+                    </Flex>
+                  </DropdownMenu.Item>
                   <DropdownMenu.Item 
                     onClick={() => setIsDark(!isDark)}
                   >
@@ -219,11 +215,6 @@ export const App = () => {
               ) : (
                 <Directory onSelectDeveloper={setSelectedDeveloperId} />
               )
-            )}
-            {activeTab === 'info' && (
-              <Card style={{ padding: '20px' }}>
-                <Info />
-              </Card>
             )}
           </Box>
         </Container>

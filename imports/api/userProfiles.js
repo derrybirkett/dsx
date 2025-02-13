@@ -7,6 +7,119 @@ import { Accounts } from 'meteor/accounts-base';
 // Create the collection
 export const UserProfiles = new Mongo.Collection('userProfiles');
 
+// Function to fetch GitHub profile data - server only
+const fetchGitHubProfile = Meteor.isServer ? async (accessToken) => {
+  console.log('Fetching GitHub profile with token:', accessToken?.slice(0, 4) + '...');
+  try {
+    // Fetch user profile
+    const result = await HTTP.get('https://api.github.com/user', {
+      headers: {
+        'User-Agent': 'Meteor App',
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+    
+    // Fetch user's repositories
+    const reposResult = await HTTP.get('https://api.github.com/user/repos', {
+      headers: {
+        'User-Agent': 'Meteor App',
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/vnd.github.v3+json'
+      },
+      params: {
+        sort: 'updated',
+        per_page: 100,
+        direction: 'desc'
+      }
+    });
+
+    // Calculate total stars and languages
+    const totalStars = reposResult.data.reduce((sum, repo) => sum + repo.stargazers_count, 0);
+    const languages = {};
+    reposResult.data.forEach(repo => {
+      if (repo.language) {
+        languages[repo.language] = (languages[repo.language] || 0) + 1;
+      }
+    });
+
+    // Process all repositories data
+    const allRepositories = reposResult.data.map(repo => ({
+      name: repo.name,
+      fullName: repo.full_name,
+      description: repo.description,
+      stars: repo.stargazers_count,
+      forks: repo.forks_count,
+      language: repo.language,
+      url: repo.html_url,
+      updatedAt: repo.updated_at,
+      topics: repo.topics || [],
+      isPrivate: repo.private,
+      isFork: repo.fork,
+      createdAt: repo.created_at,
+      size: repo.size,
+      defaultBranch: repo.default_branch,
+      openIssues: repo.open_issues_count,
+      hasPages: repo.has_pages,
+      archived: repo.archived
+    }));
+
+    // Sort repositories by stars and get top 4 for the overview
+    const topRepos = allRepositories
+      .sort((a, b) => b.stars - a.stars)
+      .slice(0, 4);
+
+    // Fetch contribution stats
+    const contributionsResult = await HTTP.get(`https://api.github.com/users/${result.data.login}/events`, {
+      headers: {
+        'User-Agent': 'Meteor App',
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+
+    console.log('GitHub Events API response:', {
+      status: contributionsResult.statusCode,
+      eventCount: contributionsResult.data.length,
+      firstEvent: contributionsResult.data[0],
+      types: [...new Set(contributionsResult.data.map(event => event.type))]
+    });
+
+    const recentActivity = contributionsResult.data
+      .slice(0, 10)
+      .map(event => ({
+        type: event.type,
+        repo: event.repo.name,
+        createdAt: event.created_at,
+        payload: event.payload
+      }));
+
+    console.log('Processed activity data:', {
+      count: recentActivity.length,
+      firstActivity: recentActivity[0]
+    });
+
+    return {
+      ...result.data,
+      topRepositories: topRepos,
+      allRepositories,
+      stats: {
+        totalStars,
+        languages,
+        contributionsLastYear: 0, // We'll add this later
+        recentActivity
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching GitHub profile:', {
+      statusCode: error.response?.statusCode,
+      message: error.message,
+      response: error.response?.content
+    });
+    throw new Meteor.Error('github.fetch-failed', 'Failed to fetch GitHub profile: ' + error.message);
+  }
+} : null;
+
 if (Meteor.isServer) {
   // Ensure publications are registered at startup
   Meteor.startup(() => {
@@ -36,11 +149,24 @@ if (Meteor.isServer) {
             githubFollowing: 1,
             githubRepos: 1,
             topRepositories: 1,
+            allRepositories: 1,
+            stats: 1,
+            followers: 1,
+            following: 1,
             updatedAt: 1
           }
         }
       );
-      console.log('Found profile:', profile.fetch());
+
+      const profileData = profile.fetch()[0];
+      console.log('Publishing profile data:', {
+        userId,
+        hasStats: !!profileData?.stats,
+        hasActivity: !!profileData?.stats?.recentActivity,
+        activityCount: profileData?.stats?.recentActivity?.length,
+        firstActivity: profileData?.stats?.recentActivity?.[0]
+      });
+
       return profile;
     });
 
@@ -60,6 +186,11 @@ if (Meteor.isServer) {
               company: 1,
               githubUsername: 1,
               githubUrl: 1,
+              githubFollowers: 1,
+              githubFollowing: 1,
+              githubRepos: 1,
+              followers: 1,
+              following: 1,
               updatedAt: 1
             }
           }
@@ -145,70 +276,6 @@ if (Meteor.isServer) {
     await UserProfiles.createIndexAsync({ userId: 1 }, { unique: true });
   });
 
-  // Function to fetch GitHub profile data
-  const fetchGitHubProfile = async (accessToken) => {
-    console.log('Fetching GitHub profile with token:', accessToken?.slice(0, 4) + '...');
-    try {
-      const result = await HTTP.get('https://api.github.com/user', {
-        headers: {
-          'User-Agent': 'Meteor App',
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/vnd.github.v3+json'
-        }
-      });
-      
-      // Fetch user's repositories
-      const reposResult = await HTTP.get('https://api.github.com/user/repos', {
-        headers: {
-          'User-Agent': 'Meteor App',
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/vnd.github.v3+json'
-        },
-        params: {
-          sort: 'updated',
-          per_page: 100,
-          direction: 'desc'
-        }
-      });
-
-      // Sort repositories by stars and get top 4
-      const topRepos = reposResult.data
-        .sort((a, b) => b.stargazers_count - a.stargazers_count)
-        .slice(0, 4)
-        .map(repo => ({
-          name: repo.name,
-          fullName: repo.full_name,
-          description: repo.description,
-          stars: repo.stargazers_count,
-          forks: repo.forks_count,
-          language: repo.language,
-          url: repo.html_url
-        }));
-
-      console.log('GitHub profile data:', {
-        login: result.data.login,
-        name: result.data.name,
-        bio: result.data.bio,
-        location: result.data.location,
-        company: result.data.company,
-        avatar_url: result.data.avatar_url,
-        topReposCount: topRepos.length
-      });
-
-      return {
-        ...result.data,
-        topRepositories: topRepos
-      };
-    } catch (error) {
-      console.error('Error fetching GitHub profile:', {
-        statusCode: error.response?.statusCode,
-        message: error.message,
-        response: error.response?.content
-      });
-      throw new Meteor.Error('github.fetch-failed', 'Failed to fetch GitHub profile: ' + error.message);
-    }
-  };
-
   // Function to fetch repository data
   const fetchGitHubRepo = async (accessToken, repoName) => {
     console.log('Fetching GitHub repo:', repoName);
@@ -274,6 +341,10 @@ if (Meteor.isServer) {
           githubFollowing: githubProfile.following,
           githubRepos: githubProfile.public_repos,
           topRepositories: githubProfile.topRepositories || [],
+          allRepositories: githubProfile.allRepositories || [],
+          stats: githubProfile.stats || {},
+          followers: [],
+          following: [],
           createdAt: new Date(),
           updatedAt: new Date(),
           lastGithubSync: new Date()
@@ -287,7 +358,8 @@ if (Meteor.isServer) {
         
         console.log('Created/updated initial user profile:', {
           userId: user._id,
-          username: githubProfile.login
+          username: githubProfile.login,
+          repoCount: githubProfile.allRepositories?.length
         });
       } catch (error) {
         console.error('Error during user creation:', error);
@@ -302,6 +374,8 @@ if (Meteor.isServer) {
               company: '',
               githubUsername: github.username,
               githubUrl: `https://github.com/${github.username}`,
+              followers: [],
+              following: [],
               createdAt: new Date(),
               updatedAt: new Date()
             }
@@ -332,6 +406,11 @@ if (Meteor.isServer) {
       const githubProfile = await fetchGitHubProfile(accessToken);
       console.log('Successfully fetched GitHub profile on login');
 
+      // Get existing profile to preserve followers/following
+      const existingProfile = await UserProfiles.findOneAsync({ userId: user._id });
+      const followers = existingProfile?.followers || [];
+      const following = existingProfile?.following || [];
+
       const updateResult = await UserProfiles.upsertAsync(
         { userId: user._id },
         {
@@ -345,6 +424,10 @@ if (Meteor.isServer) {
             githubFollowing: githubProfile.following,
             githubRepos: githubProfile.public_repos,
             topRepositories: githubProfile.topRepositories || [],
+            allRepositories: githubProfile.allRepositories || [],
+            stats: githubProfile.stats || {},
+            followers,
+            following,
             updatedAt: new Date(),
             lastGithubSync: new Date()
           }
@@ -369,6 +452,10 @@ if (Meteor.isServer) {
           githubFollowing: githubProfile.following,
           githubRepos: githubProfile.public_repos,
           topRepositories: githubProfile.topRepositories || [],
+          allRepositories: githubProfile.allRepositories || [],
+          stats: githubProfile.stats || {},
+          followers,
+          following,
           createdAt: new Date(),
           updatedAt: new Date(),
           lastGithubSync: new Date()
@@ -392,6 +479,8 @@ if (Meteor.isServer) {
           company: '',
           githubUsername: user.services?.github?.username,
           githubUrl: `https://github.com/${user.services?.github?.username}`,
+          followers: [],
+          following: [],
           createdAt: new Date(),
           updatedAt: new Date()
         });
@@ -455,6 +544,8 @@ Meteor.methods({
             githubFollowing: githubProfile.following,
             githubRepos: githubProfile.public_repos,
             topRepositories: githubProfile.topRepositories || [],
+            allRepositories: githubProfile.allRepositories || [],
+            stats: githubProfile.stats || {},
             updatedAt: new Date(),
             lastGithubSync: new Date()
           }
@@ -467,5 +558,64 @@ Meteor.methods({
       console.error('Error during manual GitHub sync:', error);
       throw new Meteor.Error('github.sync-failed', 'Failed to sync with GitHub: ' + error.message);
     }
+  },
+
+  async 'userProfiles.toggleFollow'(targetUserId) {
+    if (!this.userId) {
+      throw new Meteor.Error('not-authorized', 'You must be logged in to follow users');
+    }
+
+    if (this.userId === targetUserId) {
+      throw new Meteor.Error('invalid-operation', 'You cannot follow yourself');
+    }
+
+    const existingProfile = await UserProfiles.findOneAsync({ userId: this.userId });
+    if (!existingProfile) {
+      throw new Meteor.Error('not-found', 'Your profile not found');
+    }
+
+    const targetProfile = await UserProfiles.findOneAsync({ userId: targetUserId });
+    if (!targetProfile) {
+      throw new Meteor.Error('not-found', 'Target profile not found');
+    }
+
+    const following = existingProfile.following || [];
+    const isFollowing = following.includes(targetUserId);
+
+    if (isFollowing) {
+      // Unfollow
+      await UserProfiles.updateAsync(
+        { userId: this.userId },
+        { 
+          $pull: { following: targetUserId },
+          $set: { updatedAt: new Date() }
+        }
+      );
+      await UserProfiles.updateAsync(
+        { userId: targetUserId },
+        { 
+          $pull: { followers: this.userId },
+          $set: { updatedAt: new Date() }
+        }
+      );
+    } else {
+      // Follow
+      await UserProfiles.updateAsync(
+        { userId: this.userId },
+        { 
+          $addToSet: { following: targetUserId },
+          $set: { updatedAt: new Date() }
+        }
+      );
+      await UserProfiles.updateAsync(
+        { userId: targetUserId },
+        { 
+          $addToSet: { followers: this.userId },
+          $set: { updatedAt: new Date() }
+        }
+      );
+    }
+
+    return !isFollowing;
   }
 }); 
