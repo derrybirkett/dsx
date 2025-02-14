@@ -1,1 +1,7 @@
 node_modules/
+
+# Settings files with sensitive data
+settings.json
+settings.*.json
+settings.development.json
+settings.production.json
