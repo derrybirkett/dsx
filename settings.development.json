@@ -1,5 +1,16 @@
 {
+  "galaxy.meteor.com": {
+    "env": {
+      "MONGO_URL": "mongodb+srv://dbrktt:<db_password>@dsx.ti26clg.mongodb.net/?retryWrites=true&w=majority&appName=DSX",
+      "MONGO_OPLOG_URL": "mongodb+srv://dbrktt:<db_password>@dsx.ti26clg.mongodb.net/local?retryWrites=true&w=majority",
+      "ROOT_URL": "https://dsxx.meteorapp.com"
+    }
+  },
   "public": {
+    "github": {
+      "clientId": "60fca74bb246ce76f0ff",
+      "secret": "0e653d680cb0943ecca863f87e89d0b136d6488c"
+    }
   },
   "private": {
     "github": {
